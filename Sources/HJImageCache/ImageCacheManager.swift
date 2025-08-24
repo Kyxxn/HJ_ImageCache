@@ -28,17 +28,15 @@ public actor ImageCacheManager {
     
     // MARK: - Caching Methods
     
-    public func setImage(_ image: UIImage, forKey key: String) {
+    public func setImage(_ image: UIImage, originalData: Data, forKey key: String) {
         let cost = image.cgImage.flatMap { $0.bytesPerRow * $0.height } ?? 0
         memoryCache.setObject(image, forKey: key as NSString, cost: cost)
         
         let fileURL = cacheFileURL(forKey: key)
         
         Task.detached {
-            guard let data = image.pngData() else { return }
-            
             do {
-                try data.write(to: fileURL)
+                try originalData.write(to: fileURL)
             } catch {
                 HJLogger.error("ImageCache 디스크 쓰기 실패: \(error)")
             }

@@ -53,7 +53,7 @@ public actor ImageLoader: ImageLoaderProtocol {
         }
 
         HJLogger.network("이미지 로드 성공 (from Network): \(key)")
-        await cacheManager.setImage(image, forKey: key)
+        await cacheManager.setImage(image, originalData: data, forKey: key)
         
         return image
     }
