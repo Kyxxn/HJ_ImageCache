@@ -59,6 +59,37 @@ public actor ImageCacheManager {
         return image
     }
     
+    public func clearMemoryCache() {
+        memoryCache.removeAllObjects()
+    }
+    
+    public func clearDiskCache() {
+        do {
+            let fileURLs = try fileManager.contentsOfDirectory(
+                at: cacheDirectory,
+                includingPropertiesForKeys: nil
+            )
+            
+            for fileURL in fileURLs {
+                try fileManager.removeItem(at: fileURL)
+            }
+            HJLogger.info("전체 디스크 캐시 삭제 완료")
+        } catch {
+            HJLogger.error("전체 디스크 캐시 삭제 실패: \(error)")
+        }
+    }
+    
+    public func removeImage(forKey key: String) {
+        memoryCache.removeObject(forKey: key as NSString)
+        
+        let fileURL = cacheFileURL(forKey: key)
+        do {
+            try fileManager.removeItem(at: fileURL)
+        } catch {
+            HJLogger.error("디스크 캐시 삭제 실패: \(error)")
+        }
+    }
+    
     // MARK: - Helper
     
     private func cacheFileURL(forKey key: String) -> URL {
