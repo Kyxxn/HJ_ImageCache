@@ -2,18 +2,29 @@ import UIKit
 import CryptoKit
 
 public actor ImageCacheManager {
-    public static let shared = ImageCacheManager()
+    
+    // MARK: - Singleton
+    
+    public private(set) static var shared = ImageCacheManager(config: .default())
+    
+    public static func setup(with config: ImageCacheConfig) {
+        shared = ImageCacheManager(config: config)
+    }
     
     // MARK: - Properties
     
     private let memoryCache = NSCache<NSString, UIImage>()
     private let fileManager = FileManager.default
     private let cacheDirectory: URL
+    private let config: ImageCacheConfig
     
     // MARK: - Initializer
-    
-    private init() {
-        cacheDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("ImageCache")
+    private init(config: ImageCacheConfig) {
+        self.config = config
+        self.cacheDirectory = fileManager.urls(
+            for: .cachesDirectory,
+            in: .userDomainMask
+        )[0].appendingPathComponent("ImageCache")
         
         do {
             try fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
@@ -21,9 +32,8 @@ public actor ImageCacheManager {
             HJLogger.error("ImageCache 디렉토리 생성 실패: \(error)")
         }
         
-        let totalMemory = ProcessInfo.processInfo.physicalMemory
-        let cacheLimit = totalMemory / 4
-        memoryCache.totalCostLimit = Int(cacheLimit)
+        memoryCache.totalCostLimit = config.memoryCacheCostLimit
+        memoryCache.countLimit = config.memoryCacheCountLimit
     }
     
     // MARK: - Caching Methods
