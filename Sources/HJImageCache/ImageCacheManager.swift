@@ -19,6 +19,7 @@ public actor ImageCacheManager {
     private let config: ImageCacheConfig
     
     // MARK: - Initializer
+    
     private init(config: ImageCacheConfig) {
         self.config = config
         self.cacheDirectory = fileManager.urls(
@@ -71,6 +72,74 @@ public actor ImageCacheManager {
     
     public func clearMemoryCache() {
         memoryCache.removeAllObjects()
+    }
+    
+    public func cleanExpiredDiskCache() {
+        let resourceKeys: Set<URLResourceKey> = [
+            .isDirectoryKey,
+            .contentModificationDateKey,
+            .creationDateKey,
+            .totalFileAllocatedSizeKey,
+            .fileAllocatedSizeKey
+        ]
+        
+        guard let fileURLs = try? fileManager.contentsOfDirectory(
+            at: cacheDirectory,
+            includingPropertiesForKeys: Array(resourceKeys),
+            options: [.skipsHiddenFiles]
+        ) else {
+            HJLogger.error("캐시 디렉토리의 파일 목록을 가져오는 데 실패했습니다.")
+            return
+        }
+        
+        let now = Date()
+        var totalSize: UInt64 = 0
+        var unexpiredFiles: [(url: URL, modificationDate: Date, fileSize: UInt64)] = []
+        
+        for fileURL in fileURLs {
+            guard let resourceValues = try? fileURL.resourceValues(forKeys: resourceKeys),
+                  resourceValues.isDirectory != true else {
+                continue
+            }
+            
+            // 수정일(없으면 생성일) 추출
+            let modificationDate = resourceValues.contentModificationDate
+            ?? resourceValues.creationDate
+            ?? Date.distantPast
+            
+            // 파일 크기 (totalFileAllocatedSize -> fileAllocatedSize 순으로 fallback)
+            let sizeInt = resourceValues.totalFileAllocatedSize ?? resourceValues.fileAllocatedSize ?? 0
+            let fileSize = UInt64(max(0, sizeInt))
+            
+            // 만료 여부 판단
+            if now.timeIntervalSince(modificationDate) > config.maxDiskCacheAge {
+                do {
+                    try fileManager.removeItem(at: fileURL)
+                } catch {
+                    HJLogger.error("만료 파일 삭제 실패: \(fileURL.lastPathComponent) - \(error)")
+                }
+            } else {
+                unexpiredFiles.append((url: fileURL, modificationDate: modificationDate, fileSize: fileSize))
+                totalSize &+= fileSize
+            }
+        }
+        
+        let maxSize = UInt64(config.maxDiskCacheSize)
+        guard totalSize > maxSize else {
+            return
+        }
+        
+        unexpiredFiles.sort { $0.modificationDate < $1.modificationDate }
+        
+        for entry in unexpiredFiles {
+            if totalSize <= maxSize { break }
+            do {
+                try fileManager.removeItem(at: entry.url)
+                totalSize &-= min(totalSize, entry.fileSize)
+            } catch {
+                HJLogger.error("용량 초과 정리 중 삭제 실패: \(entry.url.lastPathComponent) - \(error)")
+            }
+        }
     }
     
     public func clearDiskCache() {
