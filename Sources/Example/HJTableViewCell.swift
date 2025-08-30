@@ -27,10 +27,6 @@ final class HJTableViewCell: UITableViewCell {
         return label
     }()
     
-    // MARK: - Properties
-    
-    private var imageLoadTask: Task<Void, Never>?
-    
     // MARK: - Initializer
     
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
@@ -48,8 +44,6 @@ final class HJTableViewCell: UITableViewCell {
     override func prepareForReuse() {
         super.prepareForReuse()
         
-        imageLoadTask?.cancel()
-        imageLoadTask = nil
         iconImageView.image = nil
         nameLabel.text = nil
     }
@@ -87,6 +81,6 @@ final class HJTableViewCell: UITableViewCell {
         nameLabel.text = item.name
         
         let targetURL = (currentStyle == .dark) ? item.darkImageURL : item.lightImageURL
-        imageLoadTask = iconImageView.loadImage(from: targetURL)
+        iconImageView.loadImage(from: targetURL)
     }
 }

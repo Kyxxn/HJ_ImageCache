@@ -9,25 +9,25 @@ public protocol ImageLoaderProtocol {
 }
 
 public actor ImageLoader: ImageLoaderProtocol {
-
+    
     // MARK: - Singleton (Type Properties/Methods)
-
-    public private(set) static var shared: ImageLoader = .init()
-
+    
+    public private(set) static var shared = ImageLoader()
+    
     public static func configure(
         cacheManager: ImageCacheManager = .shared,
         networkService: NetworkServiceProtocol = NetworkService()
     ) {
         shared = ImageLoader(cacheManager: cacheManager, networkService: networkService)
     }
-
+    
     // MARK: - Dependencies (Instance Properties)
-
+    
     private let cacheManager: ImageCacheManager
     private let networkService: NetworkServiceProtocol
-
-    // MARK: - Init
-
+    
+    // MARK: - Initializer
+    
     public init(
         cacheManager: ImageCacheManager = .shared,
         networkService: NetworkServiceProtocol = NetworkService()
@@ -35,23 +35,23 @@ public actor ImageLoader: ImageLoaderProtocol {
         self.cacheManager = cacheManager
         self.networkService = networkService
     }
-
+    
     // MARK: - Public API
-
+    
     public func loadImage(from url: URL) async throws -> UIImage {
         let key = url.absoluteString
-
+        
         if let cached = await cacheManager.image(forKey: key) {
             HJLogger.info("이미지 로드 성공 (from Cache): \(key)")
             return cached
         }
-
+        
         let data = try await networkService.request(from: url)
-
+        
         guard let image = UIImage(data: data) else {
             throw ImageLoaderError.decodingError(URLError(.cannotDecodeContentData))
         }
-
+        
         HJLogger.network("이미지 로드 성공 (from Network): \(key)")
         await cacheManager.setImage(image, originalData: data, forKey: key)
         
