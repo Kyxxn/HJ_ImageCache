@@ -17,6 +17,7 @@ public actor ImageCacheManager {
     private let fileManager = FileManager.default
     private let cacheDirectory: URL
     private let config: ImageCacheConfig
+    private let notificationObserver: NotificationObserver?
     
     // MARK: - Initializer
     
@@ -35,6 +36,10 @@ public actor ImageCacheManager {
         
         memoryCache.totalCostLimit = config.memoryCacheCostLimit
         memoryCache.countLimit = config.memoryCacheCountLimit
+        
+        let observer = NotificationObserver()
+        notificationObserver = observer
+        observer.setCacheManager(self)
     }
     
     // MARK: - Caching Methods
