@@ -5,7 +5,7 @@ public protocol ImageLoaderProtocol {
     /// 캐시를 먼저 확인하고, 없는 경우에만 네트워크를 통해 데이터를 가져와 이미지로 변환합니다.
     /// - Parameter url: 이미지의 URL
     /// - Returns: 로드된 UIImage 객체
-    func loadImage(from url: URL) async throws -> UIImage
+    func loadImage(from url: URL, downsampleTo size: CGSize?) async throws -> UIImage
 }
 
 public actor ImageLoader: ImageLoaderProtocol {
@@ -39,16 +39,19 @@ public actor ImageLoader: ImageLoaderProtocol {
     
     // MARK: - Public API
     
-    public func loadImage(from url: URL) async throws -> UIImage {
-        let key = url.absoluteString
+    public func loadImage(from url: URL, downsampleTo size: CGSize? = nil) async throws -> UIImage {
+        var cacheKey = url.absoluteString
+        if let size {
+            cacheKey += "_\(Int(size.width))x\(Int(size.height))"
+        }
         
-        if let cached = await cacheManager.image(forKey: key) {
-            HJLogger.info("이미지 로드 성공 (from Cache): \(key)")
+        if let cached = await cacheManager.image(forKey: cacheKey) {
+            HJLogger.info("이미지 로드 성공 (from Cache): \(cacheKey)")
             return cached
         }
         
         if let existingTask = activeTasks[url] {
-            HJLogger.info("중복 요청 병합: \(key)")
+            HJLogger.info("중복 요청 병합: \(cacheKey)")
             return try await existingTask.value
         }
         
@@ -57,14 +60,19 @@ public actor ImageLoader: ImageLoaderProtocol {
             
             let data = try await networkService.request(from: url)
             
-            guard let image = UIImage(data: data) else {
+            let imageToCache: UIImage
+            if let size, let downsampledImage = UIImage.downsampleImage(at: data, to: size, scale: await UIScreen.main.scale) {
+                imageToCache = downsampledImage
+            } else if let originalImage = UIImage(data: data) {
+                imageToCache = originalImage
+            } else {
                 throw ImageLoaderError.decodingError(URLError(.cannotDecodeContentData))
             }
             
-            HJLogger.network("이미지 로드 성공 (from Network): \(key)")
-            await cacheManager.setImage(image, originalData: data, forKey: key)
+            HJLogger.network("이미지 로드 성공 (from Network): \(url.absoluteString)")
+            await cacheManager.setImage(imageToCache, originalData: data, forKey: cacheKey)
             
-            return image
+            return imageToCache
         }
         
         activeTasks[url] = newTask

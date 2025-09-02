@@ -25,9 +25,10 @@ extension UIImageView {
             return nil
         }
         
+        let downsampleSize = self.bounds.size
         let task = Task {
             do {
-                let loadedimage = try await loader.loadImage(from: url)
+                let loadedimage = try await loader.loadImage(from: url, downsampleTo: downsampleSize)
                 try Task.checkCancellation()
                 
                 if !Task.isCancelled {
