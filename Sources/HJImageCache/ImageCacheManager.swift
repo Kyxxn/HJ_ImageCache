@@ -169,6 +169,24 @@ public actor ImageCacheManager {
         }
     }
     
+    public func calculateDiskCacheSize() async throws -> UInt64 {
+        let resourceKeys: Set<URLResourceKey> = [.totalFileAllocatedSizeKey]
+        let fileURLs = try fileManager.contentsOfDirectory(
+            at: cacheDirectory,
+            includingPropertiesForKeys: Array(resourceKeys),
+            options: [.skipsHiddenFiles]
+        )
+        
+        var totalSize: UInt64 = 0
+        for fileURL in fileURLs {
+            let resourceValues = try fileURL.resourceValues(forKeys: resourceKeys)
+            let sizeInt = resourceValues.totalFileAllocatedSize ?? 0
+            totalSize &+= UInt64(max(0, sizeInt))
+        }
+        
+        return totalSize
+    }
+    
     // MARK: - Helper
     
     private func cacheFileURL(forKey key: String) -> URL {
